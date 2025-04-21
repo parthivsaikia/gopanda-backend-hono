@@ -1,16 +1,89 @@
 import type { User, Session } from "../../prisma/generated/prisma/index.js";
+import prisma from "../../prisma/prisma-client.js";
+import {
+  encodeBase32LowerCaseNoPadding,
+  encodeHexLowerCase,
+} from "@oslojs/encoding";
+import { sha256 } from "@oslojs/crypto/sha2";
 
-const generateSessionToken = (): string => {};
+export const generateSessionToken = (): string => {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  const token = encodeBase32LowerCaseNoPadding(bytes);
+  return token;
+};
 
-const createSession = async (
+export const createSession = async (
   token: string,
   userId: bigint,
-): Promise<Session> => {};
+): Promise<Session> => {
+  const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
+  const session: Session = {
+    id: sessionId,
+    userId,
+    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+  };
+  await prisma.session.create({
+    data: session,
+  });
+  return session;
+};
 
-const validateSession = async (
+export const validateSession = async (
   token: string,
-): Promise<SessionValidationResult> => {};
+): Promise<SessionValidationResult> => {
+  const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
+  const result = await prisma.session.findUnique({
+    where: {
+      id: sessionId,
+    },
+    include: {
+      user: {
+        omit: { password: true },
+      },
+    },
+  });
+  if (result === null) {
+    return { session: null, user: null };
+  }
+  const { user, ...session } = result;
+  if (session.expiresAt.getTime() < Date.now()) {
+    await prisma.session.delete({
+      where: {
+        id: session.id,
+      },
+    });
 
-const invalidateSession = async (sessionId: string): Promise<void> => {};
+    return { session: null, user: null };
+  }
+  if (Date.now() >= session.expiresAt.getTime() - 1000 * 60 * 60 * 24 * 15) {
+    session.expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 15);
+    await prisma.session.update({
+      where: { id: session.id },
+      data: {
+        expiresAt: session.expiresAt,
+      },
+    });
+  }
+  return { session, user };
+};
 
-const invalidateAllSessions = async (userId: bigint): Promise<void> => {};
+export const invalidateSession = async (sessionId: string): Promise<void> => {
+  await prisma.session.delete({
+    where: {
+      id: sessionId,
+    },
+  });
+};
+
+export const invalidateAllSessions = async (userId: bigint): Promise<void> => {
+  await prisma.session.deleteMany({
+    where: {
+      userId,
+    },
+  });
+};
+
+export type SessionValidationResult =
+  | { session: null; user: null }
+  | { session: Session; user: Omit<User, "password"> };
