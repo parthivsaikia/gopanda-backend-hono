@@ -6,14 +6,14 @@ import {
 } from "@oslojs/encoding";
 import { sha256 } from "@oslojs/crypto/sha2";
 
-const generateSessionToken = (): string => {
+export const generateSessionToken = (): string => {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
   const token = encodeBase32LowerCaseNoPadding(bytes);
   return token;
 };
 
-const createSession = async (
+export const createSession = async (
   token: string,
   userId: bigint,
 ): Promise<Session> => {
@@ -29,7 +29,7 @@ const createSession = async (
   return session;
 };
 
-const validateSession = async (
+export const validateSession = async (
   token: string,
 ): Promise<SessionValidationResult> => {
   const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
@@ -68,9 +68,21 @@ const validateSession = async (
   return { session, user };
 };
 
-const invalidateSession = async (sessionId: string): Promise<void> => {};
+export const invalidateSession = async (sessionId: string): Promise<void> => {
+  await prisma.session.delete({
+    where: {
+      id: sessionId,
+    },
+  });
+};
 
-const invalidateAllSessions = async (userId: bigint): Promise<void> => {};
+export const invalidateAllSessions = async (userId: bigint): Promise<void> => {
+  await prisma.session.deleteMany({
+    where: {
+      userId,
+    },
+  });
+};
 
 export type SessionValidationResult =
   | { session: null; user: null }
