@@ -31,7 +31,42 @@ const createSession = async (
 
 const validateSession = async (
   token: string,
-): Promise<SessionValidationResult> => {};
+): Promise<SessionValidationResult> => {
+  const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
+  const result = await prisma.session.findUnique({
+    where: {
+      id: sessionId,
+    },
+    include: {
+      user: {
+        omit: { password: true },
+      },
+    },
+  });
+  if (result === null) {
+    return { session: null, user: null };
+  }
+  const { user, ...session } = result;
+  if (session.expiresAt.getTime() < Date.now()) {
+    await prisma.session.delete({
+      where: {
+        id: session.id,
+      },
+    });
+
+    return { session: null, user: null };
+  }
+  if (Date.now() >= session.expiresAt.getTime() - 1000 * 60 * 60 * 24 * 15) {
+    session.expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 15);
+    await prisma.session.update({
+      where: { id: session.id },
+      data: {
+        expiresAt: session.expiresAt,
+      },
+    });
+  }
+  return { session, user };
+};
 
 const invalidateSession = async (sessionId: string): Promise<void> => {};
 
@@ -39,4 +74,4 @@ const invalidateAllSessions = async (userId: bigint): Promise<void> => {};
 
 export type SessionValidationResult =
   | { session: null; user: null }
-  | { session: Session; user: User };
+  | { session: Session; user: Omit<User, "password"> };
