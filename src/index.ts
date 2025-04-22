@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import "./utils/types/honoContextType";
+import authRouter from "./routes/authRoutes";
 const app = new Hono();
 
 app.get("/", (c) => {
@@ -8,6 +9,8 @@ app.get("/", (c) => {
     hi: "mom",
   });
 });
+
+app.route("/auth", authRouter);
 
 serve({
   fetch: app.fetch,

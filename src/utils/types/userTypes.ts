@@ -32,3 +32,10 @@ export const UserInputUserDTO = type({
 });
 
 export type UserInputUserDTO = typeof UserInputUserDTO.infer;
+
+export const LoginInputUserDTO = type({
+  username: "string",
+  password: "string",
+});
+
+export type LoginInputUserDTO = typeof LoginInputUserDTO.infer;
