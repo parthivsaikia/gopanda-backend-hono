@@ -1,11 +1,16 @@
 import { type } from "arktype";
+import { Session } from "prisma/generated/prisma";
 import { Context, Next } from "hono";
-import { setCookie } from "hono/cookie";
+import { deleteCookie, setCookie } from "hono/cookie";
 import prisma from "prisma/prisma-client";
 import { comparePassword, hashPassword } from "~/actions/bcryptActions";
 import { createUser, getUser } from "~/actions/userActions";
-import { createSession, generateSessionToken } from "~/auth/session-api";
-import { COOKIE_NAME } from "~/config/cookie-config";
+import {
+  createSession,
+  generateSessionToken,
+  invalidateSession,
+} from "~/auth/session-api";
+import { COOKIE_NAME, DOMAIN } from "~/config/cookie-config";
 import { Env, env } from "~/config/env-config";
 import { LoginInputUserDTO, UserInputUserDTO } from "~/utils/types/userTypes";
 
@@ -102,6 +107,23 @@ export const login = async (c: Context, next: Next) => {
         role: user.role,
       },
     });
+  } catch (error) {
+    await next();
+  }
+};
+
+export const logout = async (c: Context, next: Next) => {
+  try {
+    const session = c.get("session") as Session;
+    if (session) {
+      await invalidateSession(session.id);
+      deleteCookie(c, COOKIE_NAME, {
+        path: "/",
+        domain: DOMAIN,
+        secure: env === Env.PROD,
+      });
+    }
+    return c.json({ success: true });
   } catch (error) {
     await next();
   }
