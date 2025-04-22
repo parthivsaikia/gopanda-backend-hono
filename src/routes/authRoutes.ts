@@ -1,9 +1,7 @@
 import { Hono } from "hono";
-import { UserInputUserDTO } from "~/utils/types/userTypes";
+import { login, signup } from "~/controllers/authControllers";
 
 const authRouter = new Hono();
 
-authRouter.post("/signup",  try {
-
-}
-});
+authRouter.post("/signup", signup);
+authRouter.post("/login", login);
