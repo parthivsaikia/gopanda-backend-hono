@@ -1,5 +1,5 @@
 import { type } from "arktype";
-import { Session } from "prisma/generated/prisma";
+import { Session, User } from "prisma/generated/prisma";
 import { Context, Next } from "hono";
 import { deleteCookie, setCookie } from "hono/cookie";
 import prisma from "prisma/prisma-client";
@@ -8,6 +8,7 @@ import { createUser, getUser } from "~/actions/userActions";
 import {
   createSession,
   generateSessionToken,
+  invalidateAllSessions,
   invalidateSession,
 } from "~/auth/session-api";
 import { COOKIE_NAME, DOMAIN } from "~/config/cookie-config";
@@ -121,6 +122,23 @@ export const logout = async (c: Context, next: Next) => {
         path: "/",
         domain: DOMAIN,
         secure: env === Env.PROD,
+      });
+    }
+    return c.json({ success: true });
+  } catch (error) {
+    await next();
+  }
+};
+
+export const logoutAll = async (c: Context, next: Next) => {
+  try {
+    const user = c.get("user");
+    if (user) {
+      await invalidateAllSessions(user.id);
+      deleteCookie(c, COOKIE_NAME, {
+        path: "/",
+        secure: env === Env.PROD,
+        domain: DOMAIN,
       });
     }
     return c.json({ success: true });
