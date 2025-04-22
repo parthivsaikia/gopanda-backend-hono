@@ -1,12 +1,13 @@
 import { type } from "arktype";
 import { Context, Next } from "hono";
 import { setCookie } from "hono/cookie";
-import { hashPassword } from "~/actions/bcryptActions";
+import prisma from "prisma/prisma-client";
+import { comparePassword, hashPassword } from "~/actions/bcryptActions";
 import { createUser, getUser } from "~/actions/userActions";
 import { createSession, generateSessionToken } from "~/auth/session-api";
 import { COOKIE_NAME } from "~/config/cookie-config";
 import { Env, env } from "~/config/env-config";
-import { UserInputUserDTO } from "~/utils/types/userTypes";
+import { LoginInputUserDTO, UserInputUserDTO } from "~/utils/types/userTypes";
 
 export const signup = async (c: Context, next: Next) => {
   const {
@@ -58,6 +59,49 @@ export const signup = async (c: Context, next: Next) => {
       expires: session.expiresAt,
     });
     return c.json({ success: true }, 201);
+  } catch (error) {
+    await next();
+  }
+};
+
+export const login = async (c: Context, next: Next) => {
+  try {
+    const { username, password } = await c.req.json();
+    const loginData = LoginInputUserDTO({
+      username,
+      password,
+    });
+    if (loginData instanceof type.errors) {
+      return c.json({ error: loginData.summary });
+    }
+    const user = await prisma.user.findUnique({
+      where: { username },
+    });
+    if (!user) {
+      return c.json({ error: "Invalid Credentials" }, 401);
+    }
+    const passwordValid = await comparePassword(password, user.password);
+    if (!passwordValid) {
+      return c.json({ error: "Invalid Credentials" }, 401);
+    }
+    const token = generateSessionToken();
+    const session = await createSession(token, user.id);
+    setCookie(c, COOKIE_NAME, token, {
+      path: "/",
+      httpOnly: true,
+      secure: env === Env.PROD,
+      sameSite: "Lax",
+      expires: session.expiresAt,
+    });
+    return c.json({
+      success: true,
+      user: {
+        id: user.id.toString(),
+        username: user.username,
+        name: user.name,
+        role: user.role,
+      },
+    });
   } catch (error) {
     await next();
   }
