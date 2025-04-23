@@ -237,4 +237,5 @@ model Session {
   userId    BigInt
   user      User     @relation(fields: [userId], references: [id])
   expiresAt DateTime
+  csrfToken String
 }
