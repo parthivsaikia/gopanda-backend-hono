@@ -40,7 +40,6 @@ export const createSession = async (
 
 export const validateSession = async (
   token: string,
-  csrfToken: string,
 ): Promise<SessionValidationResult> => {
   const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
   const result = await prisma.session.findUnique({
@@ -58,9 +57,6 @@ export const validateSession = async (
   }
 
   const { user, ...session } = result;
-  if (session.csrfToken !== csrfToken) {
-    return { session: null, user: null };
-  }
   if (session.expiresAt.getTime() < Date.now()) {
     await prisma.session.delete({
       where: {
