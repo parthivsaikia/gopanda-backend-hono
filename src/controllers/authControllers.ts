@@ -64,7 +64,16 @@ export const signup = async (c: Context, next: Next) => {
       path: "/",
       expires: session.expiresAt,
     });
-    return c.json({ success: true }, 201);
+    return c.json(
+      {
+        success: true,
+        id: user.id.toString(),
+        username: user.username,
+        role: user.role,
+        csrfToken: session.csrfToken,
+      },
+      201,
+    );
   } catch (error) {
     await next();
   }
@@ -101,12 +110,9 @@ export const login = async (c: Context, next: Next) => {
     });
     return c.json({
       success: true,
-      user: {
-        id: user.id.toString(),
-        username: user.username,
-        name: user.name,
-        role: user.role,
-      },
+      id: user.id.toString(),
+      username: user.username,
+      csrfToken: session.csrfToken,
     });
   } catch (error) {
     await next();
