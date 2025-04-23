@@ -13,14 +13,23 @@ export const generateSessionToken = (): string => {
   return token;
 };
 
+export const generateCsrfToken = (): string => {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  const token = encodeBase32LowerCaseNoPadding(bytes);
+  return token;
+};
+
 export const createSession = async (
   token: string,
   userId: bigint,
 ): Promise<Session> => {
+  const csrfToken = generateCsrfToken();
   const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
   const session: Session = {
     id: sessionId,
     userId,
+    csrfToken: csrfToken,
     expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
   };
   await prisma.session.create({
@@ -31,6 +40,7 @@ export const createSession = async (
 
 export const validateSession = async (
   token: string,
+  csrfToken: string,
 ): Promise<SessionValidationResult> => {
   const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
   const result = await prisma.session.findUnique({
@@ -46,7 +56,11 @@ export const validateSession = async (
   if (result === null) {
     return { session: null, user: null };
   }
+
   const { user, ...session } = result;
+  if (session.csrfToken !== csrfToken) {
+    return { session: null, user: null };
+  }
   if (session.expiresAt.getTime() < Date.now()) {
     await prisma.session.delete({
       where: {
