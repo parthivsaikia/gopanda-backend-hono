@@ -1,5 +1,5 @@
 import { type } from "arktype";
-import { Session, User } from "prisma/generated/prisma";
+import { Session } from "prisma/generated/prisma";
 import { Context, Next } from "hono";
 import { deleteCookie, setCookie } from "hono/cookie";
 import prisma from "prisma/prisma-client";
@@ -15,7 +15,13 @@ import { COOKIE_NAME, DOMAIN } from "~/config/cookie-config";
 import { Env, env } from "~/config/env-config";
 import { LoginInputUserDTO, UserInputUserDTO } from "~/utils/types/userTypes";
 
-export const signup = async (c: Context, next: Next) => {
+export const signupGet = async (c: Context) => {
+  return c.json({
+    route: "signup",
+  });
+};
+
+export const signup = async (c: Context) => {
   const {
     name,
     username,
@@ -75,7 +81,14 @@ export const signup = async (c: Context, next: Next) => {
       201,
     );
   } catch (error) {
-    await next();
+    console.error("Signup Error: ", error);
+    return c.json(
+      {
+        success: false,
+        message: "An internal error occured",
+      },
+      500,
+    );
   }
 };
 
@@ -112,10 +125,18 @@ export const login = async (c: Context, next: Next) => {
       success: true,
       id: user.id.toString(),
       username: user.username,
+      role: user.role,
       csrfToken: session.csrfToken,
     });
   } catch (error) {
-    await next();
+    console.log("Error in log in", error);
+    return c.json({
+      success: false,
+      message:
+        error instanceof Error
+          ? `error in log in: ${error.message}`
+          : `unknown error in log in`,
+    });
   }
 };
 
